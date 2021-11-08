@@ -5,24 +5,32 @@ Library           RPA.Tables
 Library           RPA.HTTP
 Library           RPA.PDF
 Library           RPA.Archive
+Library           RPA.FileSystem
+Library           RPA.Robocorp.Vault
 Library           Collections
 
 
 *** Variables ***
 ${OUTPUT_FOLDER}    ${CURDIR}${/}output${/}
 ${WORKING_FOLDER}    ${OUTPUT_FOLDER}working${/}
-${ORDER_LINK}    https://robotsparebinindustries.com/#/robot-order
 
 
 *** Keywords ***
 Open RobotSpareBin Ordering Form
-    Open Available Browser    ${ORDER_LINK}
+    ${secret}=    Get Secret    links
+    Open Available Browser    ${secret}[order_page]
     Wait Until Page Contains    Build and order your robot    timeout=30
 
 
 *** Keywords ***
+Remove All Files From Working Directory
+    Empty Directory    ${WORKING_FOLDER}
+
+
+*** Keywords ***
 Download And Read Orders File
-    Download    https://robotsparebinindustries.com/orders.csv    overwrite=True
+    ${secret}=    Get Secret    links
+    Download    ${secret}[orders_csv]    overwrite=True
     ${table}=    Read table from CSV    orders.csv    dialect=excel    header=True
     [Return]    ${table}
 
@@ -48,64 +56,48 @@ Populate Webform With Order Details
 Save Results
     [Arguments]    ${order_number}
     
-    ${pdf}=    Set Variable    ${WORKING_FOLDER}result${order_number}.pdf
-    
     ${images}=    Create List
     ...    ${WORKING_FOLDER}receipt${order_number}.png
     ...    ${WORKING_FOLDER}preview${order_number}.png
     
     Screenshot    receipt    ${images}[0]
     Screenshot    robot-preview-image    ${images}[1]
-    Add Files To PDF    ${images}    ${pdf}
-    
-    [Return]    ${pdf}
+    Add Files To PDF    ${images}    ${WORKING_FOLDER}result${order_number}.pdf
 
 
 *** Keywords ***
 Submit Order
     [Arguments]    ${order}
 
-    Close The Browser
+    Close Browser
     Open RobotSpareBin Ordering Form
     Close Constitutional Rights Modal If Exists
     Populate Webform with Order Details    ${order}
     Click Button    preview
     Click Button    order
-    ${pdf}=    Save Results    ${order}[Order number]
-    Close The Browser
-    
-    [Return]    ${pdf}
+    Save Results    ${order}[Order number]
+    Close Browser
 
 
 *** Keywords ***
 Submit Orders
-    ${pdfs}=    Create List
     ${orders}=    Download And Read Orders File
-
     FOR    ${order}    IN    @{orders}
-        ${pdf}=    Wait Until Keyword Succeeds    2 minute    5 sec    Submit Order    ${order}
+        Wait Until Keyword Succeeds    2 minute    5 sec    Submit Order    ${order}
     END
-    
-    [Return]    ${pdfs}
 
 
 *** Keywords ***
 Create ZIP File Of Receipts
-    [Arguments]    ${pdfs}
-    Add To Archive    ${pdfs}    ${OUTPUT_FOLDER}results.zip
-
-
-*** Keywords ***
-Close The Browser
-    Close Browser
+    Archive Folder With Zip    ${WORKING_FOLDER}    ${OUTPUT_FOLDER}results.zip    include=*.pdf
 
 
 *** Tasks ***
 Submit orders from a CSV file and save the receipts in a ZIP archive
-    Download And Read Orders File
-    ${pdfs}=    Submit Orders
-    Create ZIP File Of Receipts    ${pdfs}
-    [Teardown]    Close The Browser
+    Remove All Files From Working Directory
+    Submit Orders
+    Create ZIP File Of Receipts
+    [Teardown]    Close Browser
 
 
 

@@ -16,8 +16,8 @@ ${WORKING_FOLDER}    ${OUTPUT_FOLDER}working${/}
 
 *** Keywords ***
 Open RobotSpareBin Ordering Form
-    ${secret}=    Get Secret    level2_cert_secrets
-    Open Available Browser    ${secret}[order_url]
+    ${secret}=    Get Secret    links
+    Open Available Browser    ${secret}[order_page]
     Wait Until Page Contains    Build and order your robot    timeout=30
 
 *** Keywords ***
@@ -26,7 +26,8 @@ Remove All Files From Working Directory
 
 *** Keywords ***
 Download And Read Orders File
-    Download    https://robotsparebinindustries.com/orders.csv    overwrite=True
+    ${secret}=    Get Secret    links
+    Download    ${secret}[orders_csv]    overwrite=True
     ${table}=    Read table from CSV    orders.csv    dialect=excel    header=True
     [Return]    ${table}
 
